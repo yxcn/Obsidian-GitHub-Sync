@@ -18,7 +18,7 @@ interface GHSyncSettings {
 const DEFAULT_SETTINGS: GHSyncSettings = {
 	remoteURL: '',
 	gitLocation: '',
-	branchName: 'master',
+	branchName: 'main',
 	syncinterval: 0,
 	isSyncOnLoad: false,
 	checkStatusOnLoad: true,
