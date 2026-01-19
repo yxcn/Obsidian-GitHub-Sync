@@ -9,6 +9,7 @@ let git: SimpleGit;
 interface GHSyncSettings {
 	remoteURL: string;
 	gitLocation: string;
+	branchName: string;
 	syncinterval: number;
 	isSyncOnLoad: boolean;
 	checkStatusOnLoad: boolean;
@@ -17,6 +18,7 @@ interface GHSyncSettings {
 const DEFAULT_SETTINGS: GHSyncSettings = {
 	remoteURL: '',
 	gitLocation: '',
+	branchName: 'master',
 	syncinterval: 0,
 	isSyncOnLoad: false,
 	checkStatusOnLoad: true,
@@ -90,10 +92,10 @@ export default class GHSyncPlugin extends Plugin {
 		new Notice("GitHub Sync: Successfully set remote origin url");
 
 
-		// git pull origin main
+		// git pull origin branch
 	    try {
 	    	//@ts-ignore
-	    	await git.pull('origin', 'main', { '--no-rebase': null }, (err, update) => {
+	    	await git.pull('origin', this.settings.branchName, { '--no-rebase': null }, (err, update) => {
 	      		if (update) {
 					new Notice("GitHub Sync: Pulled " + update.summary.changes + " changes");
 	      		}
@@ -108,7 +110,7 @@ export default class GHSyncPlugin extends Plugin {
 			}
 			conflictMsg += "\nResolve them or click sync button again to push with unresolved conflicts."
 			new Notice(conflictMsg)
-			//@ts-ignore	
+			//@ts-ignore
 			for (let c of conflictStatus.conflicted)
 			{
 				this.app.workspace.openLinkText("", c, true);
@@ -117,10 +119,10 @@ export default class GHSyncPlugin extends Plugin {
 	    }
 
 		// resolve merge conflicts
-		// git push origin main
+		// git push origin branch
 	    if (!clean) {
 		    try {
-		    	git.push('origin', 'main', ['-u']);
+		    	git.push('origin', this.settings.branchName, ['-u']);
 		    	new Notice("GitHub Sync: Pushed on " + msg);
 		    } catch (e) {
 		    	new Notice(e, 10000);
@@ -142,8 +144,8 @@ export default class GHSyncPlugin extends Plugin {
 			git = simpleGit(simpleGitOptions);
 
 			//check for remote changes
-			// git branch --set-upstream-to=origin/main main
-			await git.branch({'--set-upstream-to': 'origin/main'});
+			// git branch --set-upstream-to=origin/branch
+			await git.branch({'--set-upstream-to': 'origin/' + this.settings.branchName});
 			let statusUponOpening = await git.fetch().status();
 			if (statusUponOpening.behind > 0)
 			{
@@ -198,7 +200,7 @@ export default class GHSyncPlugin extends Plugin {
 					//this.registerInterval(setInterval(this.SyncNotes, interval * 6 * 1000));
 					new Notice("Auto sync enabled");
 				} catch (e) {
-					
+
 				}
 			}
 		}
@@ -267,6 +269,17 @@ class GHSyncSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				})
         	.inputEl.addClass('my-plugin-setting-text2'));
+
+		new Setting(containerEl)
+			.setName('Branch name')
+			.setDesc('The branch to sync with (e.g., main or master).')
+			.addText(text => text
+				.setPlaceholder('master')
+				.setValue(this.plugin.settings.branchName)
+				.onChange(async (value) => {
+					this.plugin.settings.branchName = value;
+					await this.plugin.saveSettings();
+				}));
 
 		new Setting(containerEl)
 			.setName('Check status on startup')
