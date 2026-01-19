@@ -13,6 +13,7 @@ interface GHSyncSettings {
 	syncinterval: number;
 	isSyncOnLoad: boolean;
 	checkStatusOnLoad: boolean;
+	showSuccessNotice: boolean;
 }
 
 const DEFAULT_SETTINGS: GHSyncSettings = {
@@ -22,6 +23,7 @@ const DEFAULT_SETTINGS: GHSyncSettings = {
 	syncinterval: 0,
 	isSyncOnLoad: false,
 	checkStatusOnLoad: true,
+	showSuccessNotice: true,
 }
 
 
@@ -29,7 +31,7 @@ export default class GHSyncPlugin extends Plugin {
 
 	settings: GHSyncSettings;
 
-	async SyncNotes()
+	async SyncNotes(isManual: boolean = false)
 	{
 		new Notice("Syncing to GitHub remote")
 
@@ -68,7 +70,7 @@ export default class GHSyncPlugin extends Plugin {
 		    	new Notice(e);
 		    	return;
 		    }
-		} else {
+		} else if (isManual) {
 			new Notice("Working branch clean");
 		}
 
@@ -89,14 +91,16 @@ export default class GHSyncPlugin extends Plugin {
 			return;
 		}
 
-		new Notice("GitHub Sync: Successfully set remote origin url");
+		if (isManual || this.settings.showSuccessNotice) {
+			new Notice("GitHub Sync: Successfully set remote origin url");
+		}
 
 
 		// git pull origin branch
 	    try {
 	    	//@ts-ignore
 	    	await git.pull('origin', this.settings.branchName, { '--no-rebase': null }, (err, update) => {
-	      		if (update) {
+	      		if (update && (isManual || this.settings.showSuccessNotice)) {
 					new Notice("GitHub Sync: Pulled " + update.summary.changes + " changes");
 	      		}
 	   		})
@@ -123,7 +127,9 @@ export default class GHSyncPlugin extends Plugin {
 	    if (!clean) {
 		    try {
 		    	git.push('origin', this.settings.branchName, ['-u']);
-		    	new Notice("GitHub Sync: Pushed on " + msg);
+		    	if (isManual || this.settings.showSuccessNotice) {
+		    		new Notice("GitHub Sync: Pushed on " + msg);
+		    	}
 		    } catch (e) {
 		    	new Notice(e, 10000);
 			}
@@ -161,7 +167,9 @@ export default class GHSyncPlugin extends Plugin {
 			}
 			else
 			{
-				new Notice("GitHub Sync: up to date with remote.")
+				if (this.settings.showSuccessNotice) {
+					new Notice("GitHub Sync: up to date with remote.")
+				}
 			}
 		} catch (e) {
 			// don't care
@@ -173,7 +181,7 @@ export default class GHSyncPlugin extends Plugin {
 		await this.loadSettings();
 
 		const ribbonIconEl = this.addRibbonIcon('github', 'Sync with Remote', (evt: MouseEvent) => {
-			this.SyncNotes();
+			this.SyncNotes(true);
 		});
 		ribbonIconEl.addClass('gh-sync-ribbon');
 
@@ -181,7 +189,7 @@ export default class GHSyncPlugin extends Plugin {
 			id: 'github-sync-command',
 			name: 'Sync with Remote',
 			callback: () => {
-				this.SyncNotes();
+				this.SyncNotes(true);
 			}
 		});
 
@@ -308,6 +316,16 @@ class GHSyncSettingTab extends PluginSettingTab {
 				.setValue(String(this.plugin.settings.syncinterval))
 				.onChange(async (value) => {
 					this.plugin.settings.syncinterval = Number(value);
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName('Show success notifications')
+			.setDesc('Show notifications when sync operations complete successfully.')
+			.addToggle((toggle) => toggle
+				.setValue(this.plugin.settings.showSuccessNotice)
+				.onChange(async (value) => {
+					this.plugin.settings.showSuccessNotice = value;
 					await this.plugin.saveSettings();
 				}));
 	}
